@@ -18,7 +18,7 @@ def hello_world():
 
 """========================================================================
 # Function that find the voxel-wise intensity standard deviation across a
-# number of subjects in model space
+# number of subjects in model space (memory saving method)
 
 Note:
     - put on hold; the processing time for 100 subjects will be ~39.4 hours
@@ -30,7 +30,7 @@ Reference I/O workflow
     out_img = nib.Nifti1Image(data, img.affine)
     out_img.to_filename(mean_out_path)
 ========================================================================"""
-def multiSubj_stdev(subj_list):
+def multiSubj_stdev_bySlice(subj_list):
     #Initialize the first subject's image as a reference for the image dimensions
     ref_img = nib.load(subj_list[0])
     shape = ref_img.shape # <type 'tuple'> containing int representations of x, y and z size
@@ -72,6 +72,26 @@ def multiSubj_stdev(subj_list):
     print datatype
     print np.shape(stdev_matrix)
     print stdev_matrix.dtype
+
+
+"""========================================================================
+# Function that find the voxel-wise intensity standard deviation across a
+# number of subjects in model space (memory intensive method)
+
+Note:
+    - put on hold; the processing time for 100 subjects will be ~39.4 hours
+    - will try to find alternative / faster methods for now
+
+Reference I/O workflow
+    img = nib.load(in_file_list[0])
+    data = img.get_data()
+    out_img = nib.Nifti1Image(data, img.affine)
+    out_img.to_filename(mean_out_path)
+========================================================================"""
+def multiSubj_stdev_wholeBrain(subj_list):
+    
+
+
 
 #TODO: delete all below (test lines)
 test_dir = '/data/chamal/projects/anthony/nmf_parcellation/cortical_tractMap/seg5_tract2voxel_probability_labels/model_space/'
