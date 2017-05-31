@@ -90,8 +90,6 @@ def multiSubj_stdev_wholeBrain(subj_list, output_file_path):
     print "You'll need approximately",
     print "%.2f GB" % ((ref_img.get_data().nbytes * (len(subj_list)+1)) / 1000000000.0) ,
     print "of RAM to store all subject images"
-    print (ref_img.get_data().nbytes * 101) / 1000000000.0 #TODO: delete testline
-    return 0 #TODO: delete testline
 
     #Initialize calculation matrix
     calc_matrix = np.zeros( shape, dtype=datatype )
@@ -114,13 +112,3 @@ def multiSubj_stdev_wholeBrain(subj_list, output_file_path):
     print 'Writing output file to: %s' % output_file_path
     std_img = nib.Nifti1Image(std_matrix, ref_img.get_affine()) #Use the first image's affine; good practice?
     std_img.to_filename(output_file_path)
-
-
-
-#TODO: delete all below (test lines)
-test_dir = '/data/chamal/projects/anthony/nmf_parcellation/cortical_tractMap/seg5_tract2voxel_probability_labels/model_space/'
-test_subj_list = []
-test_subj_list.append(os.path.join(test_dir, '100307/100307_region_seg_pct_modelSpace.nii.gz'))
-test_subj_list.append(os.path.join(test_dir, '100408/100408_region_seg_pct_modelSpace.nii.gz'))
-out_path = os.path.join(test_dir, 'tets_stdev.nii.gz')
-multiSubj_stdev_wholeBrain(test_subj_list, out_path)
