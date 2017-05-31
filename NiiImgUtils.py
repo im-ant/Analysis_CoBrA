@@ -79,17 +79,43 @@ def multiSubj_stdev_bySlice(subj_list):
 # number of subjects in model space (memory intensive method)
 
 Note:
-    - put on hold; the processing time for 100 subjects will be ~39.4 hours
-    - will try to find alternative / faster methods for now
-
-Reference I/O workflow
-    img = nib.load(in_file_list[0])
-    data = img.get_data()
-    out_img = nib.Nifti1Image(data, img.affine)
-    out_img.to_filename(mean_out_path)
+    - process is memory intensive as it loads all subject brains
 ========================================================================"""
-def multiSubj_stdev_wholeBrain(subj_list):
-    
+def multiSubj_stdev_wholeBrain(subj_list, output_file_path):
+    #Initialize the first subject's image as a reference for the image dimensions
+    ref_img = nib.load(subj_list[0])
+    shape = ref_img.shape + (len(subj_list),) #4D shape - 4th dimension is the list of subjects
+    datatype = ref_img.get_data_dtype()
+
+    #Initialize calculation matrix
+    calc_matrix = np.zeros( shape, dtype=datatype )
+    #Iterate through each subject and initialize matrix
+    for subj_idx, subj_file in enumerate(subj_list):
+        #Print lines to let the user know progress
+        sys.stdout.write('\rIntializing image data, subject %d out of %d; ' % (subj_idx+1, len(subj_list)) )
+        sys.stdout.flush()
+        #Open image
+        subj_img = nib.load(subj_list[subj_idx])
+        subj_data = subj_img.get_data()
+        #Append image to 4d matrix
+        calc_matrix[:,:,:,subj_idx] = np.copy(subj_data)
+    #Let user know progress
+    print '\nAll image initialized, beginnning standard deviation calculation'
+
+    #Calcuate stdev
+    std_matrix = np.std(calc_matrix, axis=3)
+    #Output file
+    print 'Writing output file to: %s' % output_file_path
+    std_img = nib.Nifti1Image(std_matrix, ref_img.get_affine()) #Use the first image's affine; good practice?
+    std_img.to_filename(output_file_path)
+
+
+
+"""========================================================================
+# Wrapper function for the functions that
+
+========================================================================"""
+#def multiSubj_stdev (subj_list, output_file_path):
 
 
 
@@ -98,4 +124,5 @@ test_dir = '/data/chamal/projects/anthony/nmf_parcellation/cortical_tractMap/seg
 test_subj_list = []
 test_subj_list.append(os.path.join(test_dir, '100307/100307_region_seg_pct_modelSpace.nii.gz'))
 test_subj_list.append(os.path.join(test_dir, '100408/100408_region_seg_pct_modelSpace.nii.gz'))
-multiSubj_stdev(test_subj_list)
+out_path = os.path.join(test_dir, 'tets_stdev.nii.gz')
+multiSubj_stdev_wholeBrain(test_subj_list, out_path)
