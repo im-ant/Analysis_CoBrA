@@ -6,7 +6,6 @@ Started: May 29, 2017
 """
 import os
 import sys
-import glob
 import time
 import nibabel as nib
 import numpy as np
@@ -87,6 +86,13 @@ def multiSubj_stdev_wholeBrain(subj_list, output_file_path):
     shape = ref_img.shape + (len(subj_list),) #4D shape - 4th dimension is the list of subjects
     datatype = ref_img.get_data_dtype()
 
+    #Let the user know the size RAM needed for the processing
+    print "You'll need approximately",
+    print "%.2f GB" % ((ref_img.get_data().nbytes * (len(subj_list)+1)) / 1000000000.0) ,
+    print "of RAM to store all subject images"
+    print (ref_img.get_data().nbytes * 101) / 1000000000.0 #TODO: delete testline
+    return 0 #TODO: delete testline
+
     #Initialize calculation matrix
     calc_matrix = np.zeros( shape, dtype=datatype )
     #Iterate through each subject and initialize matrix
@@ -108,14 +114,6 @@ def multiSubj_stdev_wholeBrain(subj_list, output_file_path):
     print 'Writing output file to: %s' % output_file_path
     std_img = nib.Nifti1Image(std_matrix, ref_img.get_affine()) #Use the first image's affine; good practice?
     std_img.to_filename(output_file_path)
-
-
-
-"""========================================================================
-# Wrapper function for the functions that
-
-========================================================================"""
-#def multiSubj_stdev (subj_list, output_file_path):
 
 
 
