@@ -112,3 +112,47 @@ def multiSubj_stdev_wholeBrain(subj_list, output_file_path):
     print 'Writing output file to: %s' % output_file_path
     std_img = nib.Nifti1Image(std_matrix, ref_img.get_affine()) #Use the first image's affine; good practice?
     std_img.to_filename(output_file_path)
+
+
+
+"""========================================================================
+# Function that find the voxel-wise intensity mean across a number of
+# subjects in model space
+
+Note:
+    - done in an iterative fashion so it should be good for RAM
+========================================================================"""
+def multiSubj_mean(subj_list, output_file_path):
+    #Initialize the first subject's image as a reference for the image dimensions
+    print "Initializing subject 1 / referene subject..."
+    ref_img = nib.load(subj_list[0])
+    shape = ref_img.shape
+    datatype = ref_img.get_data_dtype()
+
+    #Initialize the 4d calculation matrix, load the first subject's data into it
+    calc_matrix = np.zeros( (shape + (2,)), dtype=datatype )
+    calc_matrix[:,:,:,0] = ref_img.get_data()
+    #Iterate through the 2nd --> last subject's data
+    for subj_idx, subj_file in enumerate(subj_list):
+        #Skip the first subject as it is initialized already
+        if subj_idx == 0:
+            continue
+        #Print lines to let the user know progress
+        sys.stdout.write('\rProcessing image data, subject %d out of %d; ' % (subj_idx+1, len(subj_list)) )
+        sys.stdout.flush()
+        #Open image and store in index 1 of the 4th dimension
+        curr_img = nib.load(subj_file)
+        calc_matrix[:,:,:,1] = curr_img.get_data()
+        #Sum the image and store the value in index 0 of the 4th dimension
+        calc_matrix[:,:,:,0] = np.sum(calc_matrix, axis=3)
+        #Zero the index 1 of the 4th dimension (just in case), remove if too much processing
+        calc_matrix[:,:,:,1] = np.zeros(shape, dtype=datatype)
+
+    print "\nCalculating overall average..."
+    #Divide each element by the # of subjects to get the mean matrix
+    avg_matrix = np.true_divide(calc_matrix[:,:,:,0], len(subj_list))
+
+    print "Writing to output file..."
+    #Write to output path
+    avg_img = nib.Nifti1Image(avg_matrix, ref_img.get_affine())
+    avg_img.to_filename(output_file_path)
