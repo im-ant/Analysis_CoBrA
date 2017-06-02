@@ -79,6 +79,8 @@ def multiSubj_stdev_bySlice(subj_list):
 
 Note:
     - process is memory intensive as it loads all subject brains
+    - currently fails (likely due to memory) on 100 subjects with float64
+        (does not currently work)
 ========================================================================"""
 def multiSubj_stdev_wholeBrain(subj_list, output_file_path):
     #Initialize the first subject's image as a reference for the image dimensions
@@ -108,10 +110,129 @@ def multiSubj_stdev_wholeBrain(subj_list, output_file_path):
 
     #Calcuate stdev
     std_matrix = np.std(calc_matrix, axis=3)
+    print np.sum(std_matrix) #TODO: testline delete
     #Output file
     print 'Writing output file to: %s' % output_file_path
     std_img = nib.Nifti1Image(std_matrix, ref_img.get_affine()) #Use the first image's affine; good practice?
     std_img.to_filename(output_file_path)
+
+
+"""========================================================================
+# Function that find the voxel-wise intensity standard deviation across a
+# number of subjects in model space in an iterative method
+========================================================================"""
+def multiSubj_stdev_iterative(subj_list, mean_path, stdev_path):
+    #Check if the mean file is present, if not create one
+    if not os.path.isfile(mean_path):
+        print "Sample mean file not found, creating mean file..."
+        multiSubj_mean(subj_list, mean_path)
+
+    #Open the mean image and first image as reference
+    print "Opening mean image..."
+    mean_img = nib.load(mean_path)
+    mean_matrix = mean_img.get_data()
+    print "Initializing & processing first image..."
+    ref_img = nib.load(subj_list[0])
+    shape = ref_img.shape
+    datatype = ref_img.get_data_dtype()
+    #Initialize the 4d calculation matrix and load the first subj's data
+    calc_matrix = np.zeros( (shape + (2,)), dtype=datatype )
+    calc_matrix[:,:,:,0] = np.power( np.subtract( ref_img.get_data(), mean_matrix ) , 2 )
+    #Iterate through the 2nd --> last subjects' data
+    for subj_idx, subj_file in enumerate(subj_list):
+        #Skip the first subject as it is initialized already
+        if subj_idx == 0:
+            continue
+        #Print lines to let the user know progress
+        sys.stdout.write('\rProcessing image data, subject %d out of %d; ' % (subj_idx+1, len(subj_list)) )
+        sys.stdout.flush()
+        #Open image, calculate square difference and store in index 1 of the 4th dimension
+        curr_img = nib.load(subj_file)
+        calc_matrix[:,:,:,1] = np.power( np.subtract( curr_img.get_data(), mean_matrix ) , 2 )
+        #Sum the image and store the value in index 0 of the 4th dimension
+        calc_matrix[:,:,:,0] = np.sum(calc_matrix, axis=3)
+        #Zero the index 1 of the 4th dimension (just in case), remove if too much processing
+        calc_matrix[:,:,:,1] = np.zeros(shape, dtype=datatype)
+
+    print "\nCalculating overall stdev..."
+    #Divide each element by the # of subjects to get the variance
+    var_matrix = np.true_divide(calc_matrix[:,:,:,0], (len(subj_list)) )
+    stdev_matrix = np.sqrt(var_matrix)
+
+    print "Writing to output file..."
+    #Write to output path
+    print np.shape(stdev_matrix) #TODO: testline delete
+    print np.sum(stdev_matrix) #TODO: testline delete
+    stdev_img = nib.Nifti1Image(stdev_matrix, ref_img.get_affine())
+    stdev_img.to_filename(stdev_path)
+    print "Done!"
+
+
+"""========================================================================
+# Function that find the voxel-wise intensity standard deviation across a
+# number of subjects in model space using Welford's method for variance
+
+Note:
+- Taken from wikipedia, this seems to be the best iterative method by far
+- It gave the same output on a 3 subject sample as the wholeBrain_stdev method
+========================================================================"""
+def multiSubj_stdev_welford(subj_list, stdev_path):
+    # Correctness checking step
+    if len(subj_list) < 2:
+        print "Welford's method cannot calculate variance for <2 subjects, exiting..."
+        return 1
+    #Initialize the first subject's data as reference
+    print "Initializing reference image"
+    ref_img = nib.load(subj_list[0])
+    shape = ref_img.shape
+    datatype = ref_img.get_data_dtype()
+
+    #Initialize related variables for Welford's method of calculating variance
+    n = 0.0 #element counter
+    mean_matrix = np.zeros(shape , dtype=datatype )
+    m2_matrix = np.zeros(shape , dtype=datatype )
+
+    #welford's method - one pass method for variance and mean
+    for subj_idx, subj_file in enumerate(subj_list):
+        #Print lines to let the user know progress
+        sys.stdout.write('\rProcessing image data, subject %d out of %d; ' % (subj_idx+1, len(subj_list)) )
+        sys.stdout.flush()
+        #Open image and get current subject's data
+        curr_data = nib.load(subj_file).get_data()
+        ### The below code was taken from wikipedia for welford's method ###
+        n += 1.0
+        delta = np.subtract(curr_data, mean_matrix)
+        mean_matrix = np.add( mean_matrix , np.true_divide(delta, n) )
+        delta2 = np.subtract( curr_data, mean_matrix )
+        m2_matrix = np.add (m2_matrix, np.multiply(delta, delta2) )
+        ### The above code was taken from wikipedia for welford's method ###
+
+    #Calculate the variance and standard deviation
+    print "\nCalculating overall variance & standard deviation..."
+    var_matrix = np.true_divide(m2_matrix, n) #Should be (n-1), but it seems like np.std uses n?
+    stdev_matrix = np.sqrt(var_matrix)
+    #Write to output path
+    stdev_img = nib.Nifti1Image(stdev_matrix, ref_img.get_affine())
+    stdev_img.to_filename(stdev_path)
+    print "Done!"
+
+
+
+#TODO: all testline below
+def stdev_testing():
+    #Need to add print lines to the above methods for effective testing
+    in_list = ['/data/chamal/projects/anthony/nmf_parcellation/cortical_tractMap/seg8_tract2voxel_probability_labels/model_space/100307/100307_region_seg_pct_modelSpace.nii.gz',\
+     '/data/chamal/projects/anthony/nmf_parcellation/cortical_tractMap/seg8_tract2voxel_probability_labels/model_space/100408/100408_region_seg_pct_modelSpace.nii.gz',\
+     '/data/chamal/projects/anthony/nmf_parcellation/cortical_tractMap/seg8_tract2voxel_probability_labels/model_space/101006/101006_region_seg_pct_modelSpace.nii.gz']
+    mean_path = '/data/chamal/projects/anthony/nmf_parcellation/cortical_tractMap/seg8_tract2voxel_probability_labels/model_space/seg8_winPct_avg_modelSpace.nii.gz'
+    stdev_path = '/data/chamal/projects/anthony/nmf_parcellation/cortical_tractMap/seg8_tract2voxel_probability_labels/model_space/seg8_winPct_stdev_modelSpace.nii.gz'
+    print "\n================ WHOLE BRAIN CALCULATION ================"
+    multiSubj_stdev_wholeBrain(in_list, stdev_path)
+    print "\n================ ITERATIVE CALCULATION ================"
+    multiSubj_stdev_welford(in_list, stdev_path)
+    #multiSubj_stdev_iterative(in_list, mean_path, stdev_path)
+
+#TODO: testline ends
 
 
 
@@ -124,7 +245,7 @@ Note:
 ========================================================================"""
 def multiSubj_mean(subj_list, output_file_path):
     #Initialize the first subject's image as a reference for the image dimensions
-    print "Initializing subject 1 / referene subject..."
+    print "Initializing subject 1 / reference subject..."
     ref_img = nib.load(subj_list[0])
     shape = ref_img.shape
     datatype = ref_img.get_data_dtype()
@@ -156,3 +277,4 @@ def multiSubj_mean(subj_list, output_file_path):
     #Write to output path
     avg_img = nib.Nifti1Image(avg_matrix, ref_img.get_affine())
     avg_img.to_filename(output_file_path)
+    print "Done!"
