@@ -1,3 +1,4 @@
+import sys
 import numpy as np
 
 """ countCommonEdge
@@ -16,13 +17,17 @@ Output
     an integer representing the number of common edges / pairs of points clustered
         together across the two cluster outcomes
 """
-def countCommonEdge (vec1, vec2, pointQuant):
+def countCommonEdge (vec1, vec2, pointQuant, verbose=True):
     #Initialize variable to count the stable edges across the two sets
     stableEdges = 0
 
     #Iterate over each element of each vectors
     for idx in range(0,pointQuant):
-        #User indication? TODO
+        #User indication
+        if verbose:
+            if idx%100 == 0 or idx == pointQuant-1:
+                sys.stdout.write("Counting edges: %d out of %d vertices\r"%(idx+1,pointQuant))
+                sys.stdout.flush()
         #Make a intra-vector correlation vector
         corVec1 = (vec1 == vec1[idx])
         corVec2 = (vec2 == vec2[idx])
