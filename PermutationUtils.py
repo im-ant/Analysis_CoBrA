@@ -106,3 +106,70 @@ def GenerateCatNullDistribution(attributeCount_df, attributeColName, labelColNam
             raise ValueError('The "proportionality" parameter must only be set to "labelGroup" or None')
 
     return NullAttDistribution, clusLabelsArr, attCategoryArr
+
+
+
+
+
+####################
+# Compute the frequency of the observed value based on a null distribution
+#
+# $attributeCount_df: pd.DataFrame containing each attribute and (subject group)
+#                       label to allow for the generation of a null distribution
+# $attributeColName: the column name containing value that specifies the attribute category
+# $labelColName: the column name containing value which specifies the subject group label
+# $countColname: the column name containing the count for each attribute-lable combination
+# $observationColName: the observed value (in the attributeCount_df) to be compared
+#                       against the (to-be generated) null distribution
+# $proportionality: [None/'labelGroup'] for the null distribution generator;
+#                   whether or not to output the pure count for each attribute - group
+#                   label combination, or divide by the # of individuals in each
+#                   group label
+# $N_SAMPLES: number of null samples to generate for each (group) label
+# $rngSeed: seed used for rng in null distribution generation, can be fixed
+#           for reproducibility
+#
+# Returns: dataframe containing the percentile and standard deviation of the observation
+#           given the generated null distribution
+####################
+def GetObservationFrequency(attributeCount_df, attributeColName, labelColName,
+                            countColName='counts', observationColName='proportions',
+                            proportionality='labelGroup',
+                            N_SAMPLES=100, rngSeed=None):
+    ## Get the null distribution and the attribute and cluster labels ##
+    NullDist, labelGroups, attributeCategories = GenerateCatNullDistribution(attributeCount_df,
+                                                                             attributeColName=attributeColName,
+                                                                             labelColName=labelColName,
+                                                                             countColName=countColName,
+                                                                             N_SAMPLES=N_SAMPLES,
+                                                                             proportionality=proportionality,
+                                                                             rngSeed=rngSeed)
+
+    ## Compute the frequency of observation ##
+    # Array to store output
+    propNullSmallerArr = np.empty(len(attributeCount_df))
+    stdevFromNullMean = np.empty(len(attributeCount_df))
+
+    # Iterate through each attribute - label
+    for index, row in attributeCount_df.iterrows():
+        # Find index of the label group and attribute
+        labGroupIdx = np.where(labelGroups == row[labelColName])[0][0]
+        attributeIdx = np.where(attributeCategories == row[attributeColName])[0][0]
+
+        # Get observation
+        observ = row[observationColName]
+
+        # Compute porportion in the null distribution that is smaller than the observed value
+        numNullSmaller = np.sum(np.less(NullDist[:,attributeIdx,labGroupIdx],observ))
+        propNullSmallerArr[index] = np.divide(numNullSmaller, N_SAMPLES)
+
+        # Compute stdev of observation from mean
+        nullStdev = np.std(NullDist[:,attributeIdx,labGroupIdx])
+        distanceFromNullMean = np.abs(observ - np.mean(NullDist[:,attributeIdx,labGroupIdx]))
+        stdevFromNullMean[index] = np.divide(distanceFromNullMean, nullStdev)
+
+    # Append array to dataframe
+    out_df = attributeCount_df.copy(deep=True)
+    out_df['percentNullSmaller'] = propNullSmallerArr
+    out_df['stdevFromNullMean'] = stdevFromNullMean
+    return out_df
