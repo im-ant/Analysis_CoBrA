@@ -1,5 +1,6 @@
 #############################################################################
 # Utility classes and functions for longitudinal analysis of data
+# Python 3.6 
 #############################################################################
 import numpy as np
 import pandas as pd
