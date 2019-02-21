@@ -73,8 +73,6 @@ def GenerateCatNullDistribution(attributeCount_df, attributeColName, labelColNam
                                 countColName='counts', N_SAMPLES=100,
                                 proportionality='labelGroup', rngSeed=None):
 
-    #N_SAMPLES=100, sampleOut='proportionality',
-
     # Get the cluster labels and group size per cluster label
     clusLabelSumCount_df = attributeCount_df.groupby([labelColName]).sum().reset_index()
     clusLabelsArr = clusLabelSumCount_df[labelColName].values
