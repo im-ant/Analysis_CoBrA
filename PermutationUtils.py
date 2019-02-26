@@ -66,6 +66,7 @@ def CountAttributePerLabel(labelledSubj_df, attributeColName, labelColName,
 #
 # Returns:
 #   NullAttDistribution: a numpy ndarray containing the null distribution values generated
+#                           indexing: [trial, attribute category count, cluster label index]
 #   clusLabelsArr: list containing the group label values
 #   attCategoryArr: list containing the attribute category values
 ####################
@@ -168,6 +169,72 @@ def GetObservationFrequency(attributeCount_df, attributeColName, labelColName,
 
     # Append array to dataframe
     out_df = attributeCount_df.copy(deep=True)
-    out_df['percentNullSmaller'] = propNullSmallerArr
+    out_df['proportionNullSmaller'] = propNullSmallerArr
     out_df['stdevFromNullMean'] = stdevFromNullMean
     return out_df
+
+
+
+####################
+# Compute the frequency of the observed value based on a null distribution
+#
+# $attributeCount_df: pd.DataFrame containing each attribute and (subject group)
+#                       label to allow for the generation of a null distribution
+# $attributeColName: the column name containing value that specifies the attribute category
+# $labelColName: the column name containing value which specifies the subject group label
+# $countColname: the column name containing the count for each attribute-lable combination
+# $observationColName: the observed value (in the attributeCount_df) to be compared
+#                       against the (to-be generated) null distribution
+# $proportionality: [None/'labelGroup'] for the null distribution generator;
+#                   whether or not to output the pure count for each attribute - group
+#                   label combination, or divide by the # of individuals in each
+#                   group label
+# $N_SAMPLES: number of null samples to generate for each (group) label
+# $rngSeed: seed used for rng in null distribution generation, can be fixed
+#           for reproducibility
+#
+# Returns: matplotlib object with boxplot of null distribution and red dot
+#           indicating the observation
+####################
+def BoxplotNullDistribution(attributeCount_df, attributeColName, labelColName,
+                            countColName='counts', observationColName='proportions',
+                            proportionality='labelGroup',
+                            N_SAMPLES=100, rngSeed=None):
+
+    ## Get the null distribution and the attribute and cluster labels ##
+    NullDist, labelGroups, attributeCategories = GenerateCatNullDistribution(attributeCount_df,
+                                                                             attributeColName=attributeColName,
+                                                                             labelColName=labelColName,
+                                                                             countColName=countColName,
+                                                                             N_SAMPLES=N_SAMPLES,
+                                                                             proportionality=proportionality,
+                                                                             rngSeed=rngSeed)
+    ## Get the group size per label
+    clusLabelSumCount_df = attributeCount_df.groupby([labelColName]).sum().reset_index()
+    groupSizePerClusterLabel = clusLabelSumCount_df[countColName].values
+
+    ## Generate plots (Plot each label as a separate subplot) ##
+    fig, axarr = plt.subplots(1, len(labelGroups), sharey=True)
+    for i, groupLabel in enumerate(labelGroups):
+        # Plot the generated null distribution
+        #plt.subplot(1, len(labelGroups), i+1)
+        axarr[i].boxplot(NullDist[:,:,i], labels=attributeCategories,
+                            positions=[x for x in range(len(attributeCategories))])
+        axarr[i].set_title('Label Group %s (subject N=%d)' % (str(groupLabel), groupSizePerClusterLabel[i]))
+        axarr[i].set_xlabel(attributeColName)
+        axarr[i].set_ylabel(observationColName)
+        #plt.ylim([0,1])
+
+        # Find and plot the observed value
+        for j, attributeCat in enumerate(attributeCategories):
+            # Search the input dataframe for the value I want
+            wantedRow = attributeCount_df[(attributeCount_df[labelColName]==groupLabel) &
+                                          (attributeCount_df[attributeColName]==attributeCat)]
+            if not wantedRow.empty:
+                observ = wantedRow[observationColName].values[0]
+            else:
+                observ = 0
+            # Plot the observed value
+            axarr[i].scatter(j, observ, c='red')
+
+    return fig, axarr
